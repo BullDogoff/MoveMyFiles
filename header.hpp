@@ -23,141 +23,157 @@ bool parceFile(fs::path, std::vector<std::string>&);
 std::string parceFilename(std::string);
 bool moveFiles(fs::path, std::vector<std::string>&);
 
-//		Парсим из текста числа
-//		Любые символы, кроме цифр, отбрасываем
-//		Любую последовательность цифр считаем числом, пока не упрёмся в numeric_limits<>::max()
+//	Parcing numbers from txt file
+//	Excluding all characters but digits
+//	Any numeric sequence consider as number, while below numeric_limits<>::max()
 
 bool parceFile(fs::path path_, std::vector<uint32_t>& numbers_)
 {
-	numbers_.erase(numbers_.begin(), numbers_.end());						//		Подготовка массива чисел
+	char buf_;
+	uint32_t number_;
 
-	char buf_;																//		Сюда читаем очередной байт из файла
-	uint32_t number_;														//		Сюда записываем очередное число
+	//	Prepare output vector
+	numbers_.erase(numbers_.begin(), numbers_.end());
 
-	if (fs::status(path_).type() == fs::file_type::not_found)				//		Проверка на существование
+	//	Check if file exists
+	if (fs::status(path_).type() == fs::file_type::not_found)
 	{
-		std::cout << "Can't find 'numbers.txt', program terminated" << std::endl;
+		std::cout << "Can't find '" << fs::relative(path_).string() <<"', parcing terminated" << std::endl;
 		return false;
 	}
 
 	std::ifstream file(path_);
-	if (!file.is_open())													//		Проверка на открытие
-		return false;
-
-	if (file.is_open())
+	//	Check if file opene
+	if (!file.is_open())
 	{
-		size_t length_ = 0;													//		Найдём длину файла
-		file.seekg(0, std::ios::end);
-		length_ = file.tellg();
-		file.seekg(0, std::ios::beg);
+		std::cout << "Can't open '" << fs::relative(path_).string() << "', parcing terminated" << std::endl;
+		return false;
+	}
 
-		number_ = 0;														//		Очистим буферы
-		buf_ = 0;
+	//	Find file length
+	size_t length_ = 0;
+	file.seekg(0, std::ios::end);
+	length_ = file.tellg();
+	file.seekg(0, std::ios::beg);
 
-		for (size_t it = 0; it < length_; it++)
+	//	Clear buffers
+	number_ = 0;
+	buf_ = 0;
+	
+	for (size_t i = 0; i < length_; i++)
+	{
+		//	Reading next character
+		file.read(&buf_, std::streamsize(1));
+
+		if (std::isdigit(buf_))
 		{
-			file.read(&buf_, std::streamsize(1));							//		Читаем очередной символ
-
-			if (std::isdigit(buf_))											//		Если символ - цифра
+			// Integer overflow check
+			if (number_ < std::numeric_limits<uint32_t>::max() / 10 - 10)
 			{
-				if (number_ < std::numeric_limits<uint32_t>::max() / 10)	//		Проверка на целочисленное переполнение
+				switch (buf_)
 				{
-					switch (buf_)											//		Добавляем очередной младший разряд
-					{
-					case '1':
-						number_ = number_ * 10 + 1;
-						break;
-					case '2':
-						number_ = number_ * 10 + 2;
-						break;
-					case '3':
-						number_ = number_ * 10 + 3;
-						break;
-					case '4':
-						number_ = number_ * 10 + 4;
-						break;
-					case '5':
-						number_ = number_ * 10 + 5;
-						break;
-					case '6':
-						number_ = number_ * 10 + 6;
-						break;
-					case '7':
-						number_ = number_ * 10 + 7;
-						break;
-					case '8':
-						number_ = number_ * 10 + 8;
-						break;
-					case '9':
-						number_ = number_ * 10 + 9;
-						break;
-					case '0':
-						number_ = number_ * 10 + 0;
-						break;
-					default:
-						break;
-					}
-				}
-				else
-				{
-					number_ = std::numeric_limits<uint32_t>::max();			//		/ВРЕМЕННО!/ При целочисленном переполнении присваиваем максимальное значение
+				case '1':
+					number_ = number_ * 10 + 1;
+					break;
+				case '2':
+					number_ = number_ * 10 + 2;
+					break;
+				case '3':
+					number_ = number_ * 10 + 3;
+					break;
+				case '4':
+					number_ = number_ * 10 + 4;
+					break;
+				case '5':
+					number_ = number_ * 10 + 5;
+					break;
+				case '6':
+					number_ = number_ * 10 + 6;
+					break;
+				case '7':
+					number_ = number_ * 10 + 7;
+					break;
+				case '8':
+					number_ = number_ * 10 + 8;
+					break;
+				case '9':
+					number_ = number_ * 10 + 9;
+					break;
+				case '0':
+					number_ = number_ * 10 + 0;
+					break;
+				default:
+					break;
 				}
 			}
-			else															//		Если символ не цифра
+			//	/TEMPORARY!/ On integer overflow
+			else
 			{
-				if (number_ != 0)											//		Если в буфере что-то есть
-				{
-					numbers_.push_back(number_);							//		Записываем буфер в массив
-					number_ = 0;											//		Обнуляем буфер
-				}
+				number_ = std::numeric_limits<uint32_t>::max();
 			}
 		}
-		if (number_ != 0)													//		Заглушка на случай, если последний байт в файле - цифра
+		else
 		{
-			numbers_.push_back(number_);
-			number_ = 0;
-		}
-
-		for (auto& it : numbers_)
-		{
-			std::cout << it << "\n";
+			if (number_ != 0)
+			{
+				numbers_.push_back(number_);
+				number_ = 0;
+			}
 		}
 	}
+	//	If last character is digit
+	if (number_ != 0)
+	{
+		numbers_.push_back(number_);
+		number_ = 0;
+	}
+
+#ifdef DEBUG
+
+	for (auto& it : numbers_)
+	{
+		std::cout << it << "\n";
+	}
+
+#endif // DEBUG
+
 }
 
-//		Парсим из текста числа
-//		Любые символы, кроме цифр, отбрасываем
-//		Любую последовательность цифр считаем числом, записываем в строку
+
+//	Parcing numbers from txt file
+//	Excluding all characters but digit
+//	Any numeric sequence consider as number, write into string vector
 
 bool parceFile(fs::path path_, std::vector<std::string>& strings_)
 {
+	std::string buf_;
 	std::vector<char> buffer_(0);
 
-	//		Prepare output vector
+	//	Prepare output vector
 	strings_.erase(strings_.begin(), strings_.end());
 
-	//		Check if txt file exists
+	//	Check if txt file exists
 	if (fs::status(path_).type() == fs::file_type::not_found)
 	{
-		std::cout << "\nCan't find " << path_ << " file, parcing terminated" << std::endl;
+		std::cout << "\nCan't find " << fs::relative(path_).string() << " file, parcing terminated" << std::endl;
 		return false;
 	}
 		
 	std::ifstream file_(path_);
-	//		Check if txt file opened
+	//	Check if txt file opened
 	if (!file_.is_open())
 	{
-		std::cout <<"\nCan't open " << path_ << " file, parcing terminated" << std::endl;
+		std::cout <<"\nCan't open " << fs::relative(path_).string() << " file, parcing terminated" << std::endl;
 		return false;
 	}
 
-	//		Count length of txt file
+	//	Count length of txt file
 	size_t length_ = 0;
 	file_.seekg(0, std::ios::end);
 	length_ = file_.tellg();
 	file_.seekg(0, std::ios::beg);
 
-	//		Read txt file to char vector
+	//	Read txt file to char vector
 	buffer_.resize(length_ + 1);
 	file_.read(buffer_.data(), length_);
 
@@ -168,14 +184,13 @@ bool parceFile(fs::path path_, std::vector<std::string>& strings_)
 
 #endif // DEBUG
 
-	//		Parcing char vector into string vector
-	std::string buf_;
+	//	Parcing char vector into string vector
 	for (auto& it : buffer_)
 	{
-		//		If symbol is digit
+		//	If symbol is digit
 		if (std::isdigit(it))
 			buf_.push_back(it);
-		//		If symbol is not digit
+		//	If symbol is not digit
 		else
 		{
 			if (buf_ != "")
@@ -199,8 +214,7 @@ bool parceFile(fs::path path_, std::vector<std::string>& strings_)
 	return true;
 }
 
-//		Парсим из имени файла первую последовательность цифр
-//		Возвращаем строку с номером
+//	Parcing first numeric sequence from filename
 
 std::string parceFilename(std::string filename_)
 {
@@ -224,18 +238,17 @@ std::string parceFilename(std::string filename_)
 	return parcedFilename_;
 }
 
-//		Ищем в директории назначения файлы, содержащие в названии числа из numbers
-//		Комипуем их в поддиректорию '\processed'
-//		Удаляем их из исходной директории
+//	Search for files, containing sought numbers in filename
+//	Copy them into subdirectory
+//	Delete them from original directory
 
 bool moveFiles(fs::path path_, std::vector<std::string>& strings_)
 {
-	//		Path for directory for processed files
+	//	Path for directory for processed files
 	fs::path processedPath_ = fs::path(path_ / OUTPUT_DIR);
 
-	//		Check if directory exists, then delete all
+	//	Check if directory exists
 	if (fs::status(processedPath_).type() == fs::file_type::not_found)
-		//		Create directory
 		fs::create_directory(processedPath_);
 
 	size_t count_ = 0;
@@ -246,27 +259,38 @@ bool moveFiles(fs::path path_, std::vector<std::string>& strings_)
 
 #endif // DEBUG
 
-
+	//	Check filenames if there are matches with strings_ vector (surprisingly >_>)
 	for (auto& n : strings_)
 	{
 		for (auto& p : fs::directory_iterator(path_))
 		{
+			//	Using .compare() method to find exact match
 			if (parceFilename(fs::relative(p).string()).compare(n) == 0)
 			{
-#ifdef DEBUG
-
-				std::cout << "Found match: " << fs::relative(p).string() << " and " << n << std::endl;
-
-#endif // DEBUG
-				//fs::copy_file(p, processedPath_ / fs::relative(p));
-				//fs::remove(p);
 				count_ += 1;
+
+				std::cout << "Found match: " << fs::relative(p).string() << " and " << n << "			";
+				
+				//	Check if there is enough free space
+				if (p.file_size() < fs::space(path_.root_directory()).available)
+				{
+					fs::copy_file(p, processedPath_ / fs::relative(p));
+					fs::remove(p);
+					std::cout << "MOVED" << std::endl;
+				}
+				else
+				{
+					std::cout << "\n\nNot enough space at '" << path_.root_directory().string() << "', copying terminated\n" << std::endl;
+					if (count_ > 0)
+						std::cout << "Total moved " << count_ << " files\n" << std::endl;
+					return false;
+				}
 			}
 		}
 	}
 
 	if (count_ > 0)
-		std::cout << "Succesfully moved " << count_ << " files\n" << std::endl;
+		std::cout << "Total moved " << count_ << " files\n" << std::endl;
 	else
 		std::cout << "No matches found\n" << std::endl;
 
