@@ -9,7 +9,7 @@
 int main()
 {
 	std::error_code ec_;
-	std::cout << "MoveMyFiles application, copyright BullDogoff, 2021" << std::endl;
+	std::cout << "MoveMyFiles application version 1.0b, copyright BullDogoff, 2021" << std::endl;
 
 #ifdef DEBUG
 	
