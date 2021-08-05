@@ -1,5 +1,5 @@
 //----------------------------------------------------
-//		MoveMyFiles v. 1.0b
+//		MoveMyFiles v. 1.1b
 //		© BullDogoff 2021
 //		HEADER_HPP
 //----------------------------------------------------
@@ -10,133 +10,69 @@
 #include <vector>
 #include <string>
 #include <cctype>
+#include <map>
 
 #pragma once
 
+#ifndef MOVE_MY_FILES
+#define MOVE_MY_FILES
+
 #define OUTPUT_DIR "output"
-#define DEBUG
+//#define DEBUG
 
 namespace fs = std::filesystem;
 
-bool parceFile(fs::path, std::vector<uint32_t>&);
+bool enumerateDirectoryEntries(const fs::path, std::map<std::string, fs::directory_entry>&);
 bool parceFile(fs::path, std::vector<std::string>&);
+bool digitlessFilename(const fs::path);
 std::string parceFilename(std::string);
 bool moveFiles(fs::path, std::vector<std::string>&);
 
-//	Parcing numbers from txt file
-//	Excluding all characters but digits
-//	Any numeric sequence consider as number, while below numeric_limits<>::max()
 
-bool parceFile(fs::path path_, std::vector<uint32_t>& numbers_)
+//	Enumerating directory entryes
+//	Excluding all but regular files, put them into map<entry, filename>
+//	Find first .txt file, mark as numbers source
+
+bool enumerateDirectoryEntries(const fs::path path_, std::map<std::string, fs::directory_entry>& entryMap_)
 {
-	char buf_;
-	uint32_t number_;
-
-	//	Prepare output vector
-	numbers_.erase(numbers_.begin(), numbers_.end());
-
-	//	Check if file exists
-	if (fs::status(path_).type() == fs::file_type::not_found)
+	//	Check every directory entry
+	for (auto& p : fs::directory_iterator(path_))
 	{
-		std::cout << "Can't find '" << fs::relative(path_).string() <<"', parcing terminated" << std::endl;
-		return false;
-	}
-
-	std::ifstream file(path_);
-	//	Check if file opene
-	if (!file.is_open())
-	{
-		std::cout << "Can't open '" << fs::relative(path_).string() << "', parcing terminated" << std::endl;
-		return false;
-	}
-
-	//	Find file length
-	size_t length_ = 0;
-	file.seekg(0, std::ios::end);
-	length_ = file.tellg();
-	file.seekg(0, std::ios::beg);
-
-	//	Clear buffers
-	number_ = 0;
-	buf_ = 0;
-	
-	for (size_t i = 0; i < length_; i++)
-	{
-		//	Reading next character
-		file.read(&buf_, std::streamsize(1));
-
-		if (std::isdigit(buf_))
+		//	If regular file
+		if (fs::status(p.path()).type() == fs::file_type::regular)
 		{
-			// Integer overflow check
-			if (number_ < std::numeric_limits<uint32_t>::max() / 10 - 10)
+			// If text file
+			if (p.path().extension() == ".txt" && digitlessFilename(p.path()) && !entryMap_.contains("txt"))
 			{
-				switch (buf_)
-				{
-				case '1':
-					number_ = number_ * 10 + 1;
-					break;
-				case '2':
-					number_ = number_ * 10 + 2;
-					break;
-				case '3':
-					number_ = number_ * 10 + 3;
-					break;
-				case '4':
-					number_ = number_ * 10 + 4;
-					break;
-				case '5':
-					number_ = number_ * 10 + 5;
-					break;
-				case '6':
-					number_ = number_ * 10 + 6;
-					break;
-				case '7':
-					number_ = number_ * 10 + 7;
-					break;
-				case '8':
-					number_ = number_ * 10 + 8;
-					break;
-				case '9':
-					number_ = number_ * 10 + 9;
-					break;
-				case '0':
-					number_ = number_ * 10 + 0;
-					break;
-				default:
-					break;
-				}
+				//	Mark it as numbers source
+				entryMap_.insert(std::pair<std::string, fs::directory_entry>("txt", p));
+				std::cout << "\nFound '" << fs::relative(p.path()).string() << "' file, marked as numbers source" << std::endl;
 			}
-			//	/TEMPORARY!/ On integer overflow
 			else
-			{
-				number_ = std::numeric_limits<uint32_t>::max();
-			}
-		}
-		else
-		{
-			if (number_ != 0)
-			{
-				numbers_.push_back(number_);
-				number_ = 0;
-			}
+				//	Else add it to map of all files in directory
+				entryMap_.insert(std::pair<std::string, fs::directory_entry>(fs::relative(p.path()).string(), p));
 		}
 	}
-	//	If last character is digit
-	if (number_ != 0)
+
+	if (entryMap_.empty())
 	{
-		numbers_.push_back(number_);
-		number_ = 0;
+		std::cout << "No regular files found, enumerating failed" << std::endl;
+		return false;
 	}
 
 #ifdef DEBUG
 
-	for (auto& it : numbers_)
+	std::cout << "\nDEBUG\nContents of entryMap_:\n";
+	for (auto& it : entryMap_)
 	{
-		std::cout << it << "\n";
+		std::cout << it.first << " ---> " << fs::relative(it.second) << "\n";
 	}
+	std::cout << "\n//DEBUG\n" << std::endl;
 
 #endif // DEBUG
 
+
+	return true;
 }
 
 
@@ -158,12 +94,12 @@ bool parceFile(fs::path path_, std::vector<std::string>& strings_)
 		std::cout << "\nCan't find " << fs::relative(path_).string() << " file, parcing terminated" << std::endl;
 		return false;
 	}
-		
+
 	std::ifstream file_(path_);
 	//	Check if txt file opened
 	if (!file_.is_open())
 	{
-		std::cout <<"\nCan't open " << fs::relative(path_).string() << " file, parcing terminated" << std::endl;
+		std::cout << "\nCan't open " << fs::relative(path_).string() << " file, parcing terminated" << std::endl;
 		return false;
 	}
 
@@ -179,8 +115,9 @@ bool parceFile(fs::path path_, std::vector<std::string>& strings_)
 
 #ifdef DEBUG
 
-	std::cout << "\nContents of '" << fs::relative(path_).string() << "':\n\n" << buffer_.data() << std::endl;
+	std::cout << "\nDEBUG\nContents of '" << fs::relative(path_).string() << "':\n\n" << buffer_.data() << std::endl;
 	std::cout << "\nTotal " << length_ << " characters in '" << fs::relative(path_).string() << "' file" << std::endl;
+	std::cout << "\n//DEBUG\n" << std::endl;
 
 #endif // DEBUG
 
@@ -204,15 +141,34 @@ bool parceFile(fs::path path_, std::vector<std::string>& strings_)
 
 #ifdef DEBUG
 
-	std::cout << "\nContents of 'strings_' std::vector:\n\n";
+	std::cout << "\nDEBUG\nContents of 'strings_' std::vector:\n\n";
 	for (auto& it : strings_)
 		std::cout << it.data() << std::endl;
 	std::cout << "\nTotal " << strings_.size() << " numbers in 'strings_' std::vector" << std::endl;
+	std::cout << "\n//DEBUG\n" << std::endl;
 
 #endif // DEBUG
 
 	return true;
 }
+
+
+//	Parcing filename
+//	Return true if there is no decimal digits in it
+
+bool digitlessFilename(const fs::path path_)
+{
+	for (auto& it : fs::relative(path_).string())
+	{
+		if (std::isdigit(it))
+		{
+			return false;
+		}
+	}
+
+	return true;
+}
+
 
 //	Parcing first numeric sequence from filename
 
@@ -238,12 +194,15 @@ std::string parceFilename(std::string filename_)
 	return parcedFilename_;
 }
 
+
 //	Search for files, containing sought numbers in filename
 //	Copy them into subdirectory
 //	Delete them from original directory
 
 bool moveFiles(fs::path path_, std::vector<std::string>& strings_)
 {
+	std::error_code ec;
+
 	//	Path for directory for processed files
 	fs::path processedPath_ = fs::path(path_ / OUTPUT_DIR);
 
@@ -251,13 +210,10 @@ bool moveFiles(fs::path path_, std::vector<std::string>& strings_)
 	if (fs::status(processedPath_).type() == fs::file_type::not_found)
 		fs::create_directory(processedPath_);
 
+	size_t total_ = 0;
 	size_t count_ = 0;
 
-#ifdef DEBUG
-
-	std::cout << "\nCheck filenames if there are matches with 'strings_' std::vector:\n" << std::endl;
-
-#endif // DEBUG
+	std::cout << "\nCheck filenames if there are matches with 'strings_' std::vector:\n";
 
 	//	Check filenames if there are matches with strings_ vector (surprisingly >_>)
 	for (auto& n : strings_)
@@ -267,32 +223,45 @@ bool moveFiles(fs::path path_, std::vector<std::string>& strings_)
 			//	Using .compare() method to find exact match
 			if (parceFilename(fs::relative(p).string()).compare(n) == 0)
 			{
-				count_ += 1;
-
-				std::cout << "Found match: " << fs::relative(p).string() << " and " << n << "			";
+				
+				total_ += 1;
+				std::cout << "Found match: " << fs::relative(p).string() << " and " << n << " ---> ";
 				
 				//	Check if there is enough free space
 				if (p.file_size() < fs::space(path_.root_directory()).available)
 				{
-					fs::copy_file(p, processedPath_ / fs::relative(p));
-					fs::remove(p);
-					std::cout << "MOVED" << std::endl;
+					if (!fs::copy_file(p, processedPath_ / fs::relative(p), fs::copy_options::skip_existing, ec))
+					{
+						std::cout << "\nUnable to move file '" << fs::relative(p).string() << "', error code " << ec.value() << std::endl;
+					}
+					else
+					{
+
+#ifndef DEBUG
+					
+						fs::remove(p);
+
+#endif //DEBUG
+
+						std::cout << "MOVED" << std::endl;
+						count_ += 1;
+					}
 				}
 				else
 				{
 					std::cout << "\n\nNot enough space at '" << path_.root_directory().string() << "', copying terminated\n" << std::endl;
-					if (count_ > 0)
-						std::cout << "Total moved " << count_ << " files\n" << std::endl;
-					return false;
 				}
 			}
 		}
 	}
 
-	if (count_ > 0)
-		std::cout << "Total moved " << count_ << " files\n" << std::endl;
+	if (total_ > 0)
+		std::cout << "Total moved " << count_ << " of " << total_ << " files\n" << std::endl;
 	else
 		std::cout << "No matches found\n" << std::endl;
 
 	return true;
 }
+
+
+#endif // !MOVE_MY_FILES
